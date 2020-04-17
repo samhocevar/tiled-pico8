@@ -96,7 +96,53 @@ class PICO8(T.Plugin):
         except:
             raise Exception('This map was not loaded from a PICO-8 cart.')
 
-        # FIXME: implement actual save
+        eol = b'\r\n' if cart.find(b'\r\n') >= 0 else b'\n'
+
+        def split(header):
+            gpos = cart.find(header)
+            if gpos < 0:
+                gpos = len(cart)
+            gend = cart.find(b'_', gpos + 7)
+            if gend < 0:
+                gend = len(cart)
+            data = ''.join(cart[gpos+7:gend].decode('ascii').split())
+            return cart[:gpos], data, cart[gend:]
+
+        l = T.tileLayerAt(m, 0)
+
+        # Insert gfx data into cart
+        prefix, data, suffix = split(b'__gfx__')
+
+        # First 64 lines of gfx data are from the original cart; add padding
+        # if not enough data in there
+        newdata = data[:128*64]
+        newdata += ''.join(['0' for x in range(128*64-len(newdata))])
+
+        # The next 64 lines actually come from the last 32 lines of the map
+        for n in range(128*32, 128*64):
+            t = l.cellAt(n % 128, n // 128).tile()
+            tid = t.id() if t else 0
+            newdata += '{0:02x}'.format(tid)[::-1]
+
+        # Convert data to bytes
+        newdata = newdata.encode('ascii')
+        newdata = eol.join([b'__gfx__'] + [newdata[x:x+128] for x in range(0, 128*128, 128)] + [b''])
+        cart = prefix + newdata + suffix
+
+        # Insert map data into cart
+        prefix, _, suffix = split(b'__map__')
+
+        tiles = []
+        for n in range(128*32):
+            t = l.cellAt(n % 128, n // 128).tile()
+            tid = t.id() if t else 0
+            tiles += '{0:02x}'.format(tid)
+
+        # Conert data to bytes
+        newdata = ''.join(tiles).encode('ascii')
+        newdata = eol.join([b'__map__'] + [newdata[x:x+256] for x in range(0, 256*32, 256)] + [b''])
+        cart = prefix + newdata + suffix
+
         with open(filename, 'wb') as f:
             f.write(cart)
 
