@@ -3,7 +3,7 @@ PICO-8 cart support for Tiled
 2020, <sam@hocevar.net>
 """
 import tiled as T
-import pickle, base64
+import base64
 
 PALETTE = [
     (0x00, 0x00, 0x00), # black
@@ -39,50 +39,50 @@ class PICO8(T.Plugin):
 
     @classmethod
     def read(self, filename):
-        lines = []
-        gpos, mpos = -1, -1
         with open(filename, 'rb') as f:
-            for l in f.readlines():
-                lines.append(l)
-                l = l.strip()
-                if l == b'__gfx__':
-                    gpos = len(lines)
-                elif l == b'__map__':
-                    mpos = len(lines)
+            cart = f.read()
+
+        def extract(header):
+            pos = cart.find(header)
+            if pos < 0:
+                return ''
+            pos += len(header)
+            data = cart[pos:cart.find(b'_',pos)]
+            return ''.join(data.decode('ascii').split())
 
         # Create a map
         m = T.Tiled.Map(T.Tiled.Map.Orthogonal, 128, 64, 8, 8)
-        m.setBackgroundColor(T.qt.QColor(96,96,96))
-        m.setProperty('data', base64.b64encode(pickle.dumps(lines)))
+        m.setBackgroundColor(T.qt.QColor(*PALETTE[0]))
+        m.setProperty('data', base64.b64encode(cart))
 
-        # Read gfx data into a tileset
+        # Read gfx data into an image
+        gfxdata = extract(b'__gfx__')
         pal = [T.qt.QColor(*rgb).rgb() for rgb in PALETTE]
         img = T.qt.QImage(128, 128, T.qt.QImage.Format_Indexed8)
         img.setColorTable(pal)
-        for y in range(128):
-            data = lines[gpos + y].strip()
-            if len(data) != 128:
-                break
-            data = data.decode('ascii')
-            for x in range(128):
-                img.setPixel(x, y, int(data[x], 16))
+        for i in range(min(128*128, len(gfxdata))):
+            img.setPixel(i % 128, i // 128, int(gfxdata[i], 16))
 
-        t = T.Tiled.Tileset.create('Sprites', 8,8, 0, 0)
-        t.data().loadFromImage(img, 'embedded')
+        # Create fileset from the image
+        t = T.Tiled.Tileset.create('PICO-8 Sprites', 8,8, 0, 0)
+        t.data().loadFromImage(img, '')
         m.addTileset(t)
 
         # Read map data into a layer
-        l = T.Tiled.TileLayer('Map', 0, 0, 128, 64)
-        for y in range(64):
-            data = lines[mpos + y].strip()
-            if len(data) != 256:
-                break
-            data = data.decode('ascii')
-            for x in range(128):
-                n = int(data[x*2:x*2+2], 16)
-                if n > 0:
-                    ti = t.data().tileAt(n)
-                    l.setCell(x, y, T.Tiled.Cell(ti))
+        mapdata = extract(b'__map__')
+        l = T.Tiled.TileLayer('PICO-8 Map', 0, 0, 128, 64)
+        for i in range(min(128*64, len(mapdata) // 2)):
+            n = int(mapdata[i*2:i*2+2], 16)
+            if n > 0:
+                ti = t.data().tileAt(n)
+                l.setCell(i % 128, i // 128, T.Tiled.Cell(ti))
+
+        # 2nd half of gfx data can overlap 2nd half of map
+        for i in range(128*64, min(128*128, len(gfxdata)), 2):
+            n = int(gfxdata[i:i+2][::-1], 16)
+            if n > 0:
+                ti = t.data().tileAt(n)
+                l.setCell(i // 2 % 128, i // 256, T.Tiled.Cell(ti))
 
         m.addLayer(l)
 
@@ -91,12 +91,14 @@ class PICO8(T.Plugin):
     @classmethod
     def write(self, m, filename):
 
-        lines = pickle.loads(base64.b64decode(m.propertyAsString('data')))
+        try:
+            cart = base64.b64decode(m.propertyAsString('data'))
+        except:
+            raise Exception('This map was not loaded from a PICO-8 cart.')
 
+        # FIXME: implement actual save
         with open(filename, 'wb') as f:
-            # FIXME: not implemented yet
-            for l in lines:
-                f.write(l)
-#
+            f.write(cart)
+
         return True
 
