@@ -60,7 +60,10 @@ class PICO8(T.Plugin):
         pal = [T.qt.QColor(*rgb).rgb() for rgb in PALETTE]
         img = T.qt.QImage(128, 128, T.qt.QImage.Format_Indexed8)
         img.setColorTable(pal)
+        img.fill(0)
         for i in range(min(128*128, len(gfxdata))):
+            if i % 128 < 8 and i // 128 < 8:
+                continue
             img.setPixel(i % 128, i // 128, int(gfxdata[i], 16))
 
         # Create fileset from the image
