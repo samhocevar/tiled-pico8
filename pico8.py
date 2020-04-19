@@ -111,6 +111,12 @@ class PICO8(T.Plugin):
             data = ''.join(cart[gpos+7:gend].decode('ascii').split())
             return cart[:gpos], data, cart[gend:]
 
+        def chunk(s, n):
+            empty = b'0' * n
+            while s[-n:] == empty:
+                s = s[:-n] # Remove trailing empty lines
+            return [s[i:i+n] for i in range(0, len(s), n)]
+
         l = T.tileLayerAt(m, 0)
 
         # Insert gfx data into cart
@@ -127,23 +133,21 @@ class PICO8(T.Plugin):
             tid = t.id() if t else 0
             newdata += '{0:02x}'.format(tid)[::-1]
 
-        # Convert data to bytes
-        newdata = newdata.encode('ascii')
-        newdata = eol.join([b'__gfx__'] + [newdata[x:x+128] for x in range(0, 128*128, 128)] + [b''])
+        # Convert chunked data to bytes
+        newdata = eol.join([b'__gfx__'] + chunk(newdata.encode('ascii'), 128) + [b''])
         cart = prefix + newdata + suffix
 
         # Insert map data into cart
         prefix, _, suffix = split(b'__map__')
 
-        tiles = []
+        newdata = ''
         for n in range(128*32):
             t = l.cellAt(n % 128, n // 128).tile()
             tid = t.id() if t else 0
-            tiles += '{0:02x}'.format(tid)
+            newdata += '{0:02x}'.format(tid)
 
-        # Conert data to bytes
-        newdata = ''.join(tiles).encode('ascii')
-        newdata = eol.join([b'__map__'] + [newdata[x:x+256] for x in range(0, 256*32, 256)] + [b''])
+        # Conert chunked data to bytes
+        newdata = eol.join([b'__map__'] + chunk(newdata.encode('ascii'), 256) + [b''])
         cart = prefix + newdata + suffix
 
         with open(filename, 'wb') as f:
