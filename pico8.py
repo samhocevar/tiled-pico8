@@ -22,6 +22,23 @@ PALETTE = [
     (0x83, 0x76, 0x9c), # indigo
     (0xff, 0x77, 0xa8), # pink
     (0xff, 0xcc, 0xaa), # peach
+
+    (0x29, 0x18, 0x14),
+    (0x11, 0x1d, 0x35),
+    (0x42, 0x21, 0x36),
+    (0x12, 0x53, 0x59),
+    (0x74, 0x2f, 0x29),
+    (0x49, 0x33, 0x3b),
+    (0xa2, 0x88, 0x79),
+    (0xf3, 0xef, 0x7d),
+    (0xbe, 0x12, 0x50),
+    (0xff, 0x6c, 0x24),
+    (0xa8, 0xe7, 0x2e),
+    (0x00, 0xb5, 0x43),
+    (0x06, 0x5a, 0xb5),
+    (0x75, 0x46, 0x65),
+    (0xff, 0x6e, 0x59),
+    (0xff, 0x9d, 0x81),
 ]
 
 class PICO8(T.Plugin):
@@ -54,6 +71,21 @@ class PICO8(T.Plugin):
         m = T.Tiled.Map(T.Tiled.Map.Orthogonal, 128, 64, 8, 8)
         m.setBackgroundColor(T.qt.QColor(*PALETTE[0]))
         m.setProperty('data', base64.b64encode(cart))
+
+        # Create an image and a tileset for the palette
+        pal = [T.qt.QColor(*rgb).rgb() for rgb in PALETTE]
+        tsize = 12
+        img = T.qt.QImage(4 * tsize, 8 * tsize, T.qt.QImage.Format_Indexed8)
+        img.setColorTable(pal)
+        img.fill(0)
+        for n in range(32):
+            x, y = n % 4 * tsize, n // 4 * tsize
+            for j in range(tsize):
+                for i in range(tsize):
+                    img.setPixel(x + i, y + j, n)
+        t = T.Tiled.Tileset.create('PICO-8 Palette', tsize, tsize, 0, 0)
+        t.data().loadFromImage(img, '')
+        m.addTileset(t)
 
         # Read gfx data into an image
         gfxdata = extract(b'__gfx__')
