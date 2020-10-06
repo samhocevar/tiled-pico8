@@ -36,62 +36,88 @@ var PALETTE = [
 ]
 
 function buffertohex(buf) {
-    return Array.prototype.map.call(new Uint8Array(buf), e => tohex(e,2)).join('');
+    return Array.prototype.map.call(new Uint8Array(buf), e => tohex(e,2)).join('')
 }
 
 function tohex(x, ndigits) {
-    return (x + (1 << (ndigits * 4))).toString(16).slice(-ndigits);
+    return (x + (1 << (ndigits * 4))).toString(16).slice(-ndigits)
+}
+
+function fromhex(s) {
+    return Number('0x'+s)
+}
+
+function extract(buf, header) {
+    var start = -1
+    var tmp = new Uint8Array(buf)
+    while (start < buf.byteLength) {
+        start = tmp.indexOf('_'.charCodeAt(0), start + 1)
+        if (start < 0)
+            return ''
+        var s = buf.slice(start, start + header.length).toString()
+        if (s == header)
+            break
+    }
+    start += header.length
+    let end = tmp.indexOf('_'.charCodeAt(0), start)
+    let ret = buf.slice(start, end < 0 ? buf.byteLength : end)
+    return ret.toString().replace(/\s/g, '')
 }
 
 function pico8_read(filename)
 {
-    let f = new BinaryFile(filename);
-    let cart = f.readAll();
-    f.close();
-
-    // TODO: extract func
+    let f = new BinaryFile(filename)
+    let cart = f.readAll()
+    f.close()
 
     if (cart.slice(0,16) != 'pico-8 cartridge')
-        throw new TypeError('Not a PICO-8 cartridge!');
+        throw new TypeError('Not a PICO-8 cartridge!')
 
     // Create a map
-    let m = new TileMap();
-    m.setSize(128, 64);
-    m.setTileSize(8, 8);
-    m.orientation = TileMap.Orthogonal;
-    m.backgroundColor = PALETTE[0];
-    m.setProperty('data', buffertohex(cart));
+    let tm = new TileMap()
+    tm.setSize(128, 64)
+    tm.setTileSize(8, 8)
+    tm.orientation = TileMap.Orthogonal
+    tm.backgroundColor = PALETTE[0]
+    tm.setProperty('data', buffertohex(cart))
 
     // Create an image and a tileset for the palette
-    let tsize = 12;
-    // TODO: see API in https://github.com/bjorn/tiled/pull/2787/commits/79e8e26608704649dd1cec303acbf526d65d4282
-    let img = new Image(128, 128, Format_Indexed8);
+    let tsize = 12
+    // TODO
 
-/*
-    let s = new TileSet();
+    // Read gfx data into an image
+    let gfx = extract(cart, '__gfx__')
+    let img = new Image(128, 128, Image.Format_Indexed8)
+    // FIXME: for some reason, #123abc will not work
+    img.setColorTable(Array.prototype.map.call(PALETTE, e => e.replace('#', '0xff')))
+    for (var i = 0; i < Math.min(128 * 128, gfx.length); ++i)
+        img.setPixel(i % 128, Math.floor(i / 128), fromhex(gfx[i]))
 
-    let tm = new TileMap();
-    tm.setSize(128, 64);
-    tm.setTileSize(8, 8);
+    // Create a tileset from sprite image
+    let t = new Tileset('PICO-8 Sprites')
+    t.backgroundColor = PALETTE[3]
+    t.loadFromImage(img)
+    t.setTileSize(8, 8)
+    tm.addTileset(t)
 
-    let tl = new TileLayer();
-    tl.resize(128, 64);
-    let tle = tl.edit();
-    for (let y = 0; ; ++y)
+    // Read map data into a tile layer
+    let map = extract(cart, '__map__')
+    let tl = new TileLayer()
+    tl.width = 128
+    tl.height = 64
+    let tle = tl.edit()
+    for (var y = 0; y < 64; ++y)
     {
-        let data = lines[gfx + 1 + y];
-        if (data.length != 256)
-            break;
-        for (let x = 0; x < 128; ++x)
+        for (var x = 0; x < 128; ++x)
         {
-            let id = '0x'.concat(data.substring(x * 2, x * 2 + 2));
-            //tle.setTile(x, y, new Tile // FIXME
+            let id = '0x'.concat(map.substring(y * 256 + x * 2, y * 256 + x * 2 + 2))
+            tle.setTile(x, y, t.tile(id))
         }
     }
-    tle.apply();
-*/
+    tle.apply()
+    tm.addLayer(tl)
 
-    return m;
+    return tm
 }
 
 function pico8_write(map, filename)
@@ -103,12 +129,13 @@ const pico8_format = {
     extension: "p8",
     read: pico8_read,
     write: pico8_write,
-};
+}
 
-var v = tiled.version.split('.').map((e,i) => e*100**(2-i)).reduce((a,b) => a+b);
+// FIXME: update this when the new API lands in Tiled (https://github.com/bjorn/tiled/issues/2695)
+var v = tiled.version.split('.').map((e,i) => e*100**(2-i)).reduce((a,b) => a+b)
 if (v >= 10304) {
-    tiled.registerMapFormat("PICO-8", pico8_format);
+    tiled.registerMapFormat("PICO-8", pico8_format)
 } else {
-    console.warn(`Tiled version ${tiled.version} is too old for the PICO-8 plugin (1.3.4 required)`);
+    console.warn(`Tiled version ${tiled.version} is too old for the PICO-8 plugin (1.3.4 required)`)
 }
 
