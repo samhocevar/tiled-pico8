@@ -1,3 +1,14 @@
+//
+//  PICO-8 cart support for Tiled
+//
+//  Copyright © 2020—2021 Sam Hocevar <sam@hocevar.net>
+//
+//  This program is free software. It comes without any warranty, to
+//  the extent permitted by applicable law. You can redistribute it
+//  and/or modify it under the terms of the Do What the Fuck You Want
+//  to Public License, Version 2, as published by the WTFPL Task Force.
+//  See http://www.wtfpl.net/ for more details.
+//
 
 var PALETTE = [
     "#000000", // black
@@ -35,8 +46,8 @@ var PALETTE = [
     "#ff9d81",
 ]
 
-function buffertohex(buf) {
-    return Array.prototype.map.call(new Uint8Array(buf), e => tohex(e,2)).join('')
+function reverse(str) {
+    return str.split('').reverse().join('')
 }
 
 function tohex(x, ndigits) {
@@ -79,7 +90,8 @@ function pico8_read(filename)
     tm.setTileSize(8, 8)
     tm.orientation = TileMap.Orthogonal
     tm.backgroundColor = PALETTE[0]
-    tm.setProperty('data', buffertohex(cart))
+    //tm.setProperty('Show Sprite 0', false)
+    tm.setProperty('Internal Data', Qt.btoa(cart))
 
     // Create an image and a tileset for the palette
     let tsize = 12
@@ -89,7 +101,7 @@ function pico8_read(filename)
     let gfx = extract(cart, '__gfx__')
     let img = new Image(128, 128, Image.Format_Indexed8)
     img.setColorTable(PALETTE)
-    for (var i = 0; i < Math.min(128 * 128, gfx.length); ++i)
+    for (let i = 0; i < Math.min(128 * 128, gfx.length); ++i)
         img.setPixel(i % 128, Math.floor(i / 128), fromhex(gfx[i]))
 
     // Create a tileset from sprite image
@@ -105,14 +117,16 @@ function pico8_read(filename)
     tl.width = 128
     tl.height = 64
     let tle = tl.edit()
-    for (var y = 0; y < 64; ++y)
-    {
-        for (var x = 0; x < 128; ++x)
-        {
-            let id = '0x'.concat(map.substring(y * 256 + x * 2, y * 256 + x * 2 + 2))
+    function set_tile(x, y, s) {
+        let id = '0x'.concat(s)
+        if (id > 0)
             tle.setTile(x, y, t.tile(id))
-        }
     }
+    for (let i = 0; i < Math.min(64 * 128, Math.floor(map.length / 2)); ++i)
+        set_tile(i % 128, Math.floor(i / 128), map.substring(i * 2, i * 2 + 2))
+    // The second part of the sprite data also contains map data
+    for (let i = 128 * 64; i < Math.min(128 * 128, gfx.length); i += 2)
+        set_tile(Math.floor(i / 2) % 128, Math.floor(i / 256), reverse(gfx.substring(i, i + 2)))
     tle.apply()
     tm.addLayer(tl)
 
