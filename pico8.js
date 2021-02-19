@@ -46,6 +46,9 @@ var PALETTE = [
     "#ff9d81",
 ]
 
+var HEADER = 'pico-8 cartridge'
+var PROPNAME = 'Internal Data'
+
 function reverse(str) {
     return str.split('').reverse().join('')
 }
@@ -81,7 +84,7 @@ function pico8_read(filename)
     let cart = f.readAll()
     f.close()
 
-    if (cart.slice(0,16) != 'pico-8 cartridge')
+    if (cart.slice(0, HEADER.length) != HEADER)
         throw new TypeError('Not a PICO-8 cartridge!')
 
     // Create a map
@@ -91,7 +94,7 @@ function pico8_read(filename)
     tm.orientation = TileMap.Orthogonal
     tm.backgroundColor = PALETTE[0]
     //tm.setProperty('Show Sprite 0', false)
-    tm.setProperty('Internal Data', Qt.btoa(cart))
+    tm.setProperty(PROPNAME, Qt.btoa(cart))
 
     // Create an image and a tileset for the palette
     let tsize = 12
@@ -133,9 +136,11 @@ function pico8_read(filename)
     return tm
 }
 
-function pico8_write(map, filename)
+function pico8_write(tm, filename)
 {
-    // console.log(map.property("data"))
+    let data = Qt.atob(tm.property(PROPNAME))
+    if (data.slice(0, HEADER.length) != HEADER)
+        throw new TypeError('This map was not loaded from a PICO-8 cart')
     return "unimplemented"
 }
 
