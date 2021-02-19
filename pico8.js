@@ -88,16 +88,15 @@ function pico8_read(filename)
     // Read gfx data into an image
     let gfx = extract(cart, '__gfx__')
     let img = new Image(128, 128, Image.Format_Indexed8)
-    // FIXME: for some reason, #123abc will not work
-    img.setColorTable(Array.prototype.map.call(PALETTE, e => e.replace('#', '0xff')))
+    img.setColorTable(PALETTE)
     for (var i = 0; i < Math.min(128 * 128, gfx.length); ++i)
         img.setPixel(i % 128, Math.floor(i / 128), fromhex(gfx[i]))
 
     // Create a tileset from sprite image
     let t = new Tileset('PICO-8 Sprites')
     t.backgroundColor = PALETTE[3]
-    t.loadFromImage(img)
     t.setTileSize(8, 8)
+    t.loadFromImage(img)
     tm.addTileset(t)
 
     // Read map data into a tile layer
@@ -122,6 +121,8 @@ function pico8_read(filename)
 
 function pico8_write(map, filename)
 {
+    // console.log(map.property("data"))
+    return "unimplemented"
 }
 
 const pico8_format = {
@@ -131,11 +132,9 @@ const pico8_format = {
     write: pico8_write,
 }
 
-// FIXME: update this when the new API lands in Tiled (https://github.com/bjorn/tiled/issues/2695)
 var v = tiled.version.split('.').map((e,i) => e*100**(2-i)).reduce((a,b) => a+b)
-if (v >= 10304) {
+if (v >= 10500) {
     tiled.registerMapFormat("PICO-8", pico8_format)
 } else {
-    console.warn(`Tiled version ${tiled.version} is too old for the PICO-8 plugin (1.3.4 required)`)
+    console.warn(`Tiled version ${tiled.version} is too old for the PICO-8 plugin (1.5.0 required)`)
 }
-
