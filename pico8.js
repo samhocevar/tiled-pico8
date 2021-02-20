@@ -61,27 +61,27 @@ function fromhex(s) {
     return Number('0x'+s)
 }
 
-function extract(buf, header) {
-    var start = -1
-    var tmp = new Uint8Array(buf)
-    while (start < buf.byteLength) {
-        start = tmp.indexOf('_'.charCodeAt(0), start + 1)
-        if (start < 0)
-            return ''
-        var s = buf.slice(start, start + header.length).toString()
-        if (s == header)
-            break
-    }
-    start += header.length
-    let end = tmp.indexOf('_'.charCodeAt(0), start)
-    let ret = buf.slice(start, end < 0 ? buf.byteLength : end)
-    return ret.toString().replace(/\s/g, '')
+// Extract a hexadecimal section from a p8 cart data, e.g. ‘__gfx__’
+function p8_extract(buf, header)
+{
+    return p8_split(buf, header)[1].replace(/[^0-9a-fA-F]+/g, '');
+}
+
+// Split a p8 cart in order to replace a section
+function p8_split(buf, header)
+{
+    let gpos = buf.indexOf(header);
+    gpos = gpos < 0 ? buf.length : gpos + header.length;
+    let gend = buf.indexOf('__', gpos);
+    if (gend < 0)
+        gend = buf.length;
+    return [ buf.slice(0, gpos), buf.slice(gpos, gend), buf.slice(gend, buf.length) ];
 }
 
 function pico8_read(filename)
 {
     let f = new BinaryFile(filename)
-    let cart = f.readAll()
+    let cart = f.readAll().toString();
     f.close()
 
     if (cart.slice(0, HEADER.length) != HEADER)
@@ -101,7 +101,7 @@ function pico8_read(filename)
     // TODO
 
     // Read gfx data into an image
-    let gfx = extract(cart, '__gfx__')
+    let gfx = p8_extract(cart, '__gfx__')
     let img = new Image(128, 128, Image.Format_Indexed8)
     img.setColorTable(PALETTE)
     for (let i = 0; i < Math.min(128 * 128, gfx.length); ++i)
@@ -115,13 +115,13 @@ function pico8_read(filename)
     tm.addTileset(t)
 
     // Read map data into a tile layer
-    let map = extract(cart, '__map__')
+    let map = p8_extract(cart, '__map__')
     let tl = new TileLayer()
     tl.width = 128
     tl.height = 64
     let tle = tl.edit()
     function set_tile(x, y, s) {
-        let id = '0x'.concat(s)
+        let id = fromhex(s)
         if (id > 0)
             tle.setTile(x, y, t.tile(id))
     }
@@ -138,10 +138,20 @@ function pico8_read(filename)
 
 function pico8_write(tm, filename)
 {
-    let data = Qt.atob(tm.property(PROPNAME))
-    if (data.slice(0, HEADER.length) != HEADER)
+    let cart = Qt.atob(tm.property(PROPNAME))
+    if (cart.slice(0, HEADER.length) != HEADER)
         throw new TypeError('This map was not loaded from a PICO-8 cart')
-    return "unimplemented"
+
+    let eol = cart.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+
+    let [ prefix, data, suffix ] = p8_split(cart, '__gfx__');
+    cart = prefix.concat(data).concat(suffix);
+
+    let f = new BinaryFile(filename, BinaryFile.WriteOnly);
+    f.write(cart);
+    f.commit();
+
+    return "unimplemented";
 }
 
 const pico8_format = {
