@@ -1,7 +1,12 @@
 # PICO-8 import/export plugin for Tiled
 
-*Warning*: This plugin requires Tiled version 1.5.0 or later. As of February 20, 2021, this version
-is only available as a preview release.
+## Seamlessly edit your PICO-8 carts in Tiled!
+
+*Warning*: This plugin requires [Tiled](https://www.mapeditor.org/) version 1.5.0 or later.
+As of February 20, 2021, this version is only available as a preview release.
+
+If for some reason you want to use the old, deprecated Python version of this plugin, you
+may check the old [python branch](https://github.com/samhocevar/tiled-pico8/tree/python).
 
 # Installation
 
