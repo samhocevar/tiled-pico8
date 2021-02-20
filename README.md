@@ -1,3 +1,6 @@
+**Warning**: this is the deprecated Python version of this plugin. Support for Python in
+Tiled is being deprecated and this version of the plugin will no longer be maintained.
+
 # Installation
 
  - install Tiled:
@@ -9,7 +12,7 @@
      sure you choose to add Python to `PATH` in the installer**
    - in Tiled, go to Edit → Preferences… → Plugins and make sure python.dll is enabled
  - create a `.tiled` directory in your user directory
- - download [`pico8.py`](https://raw.githubusercontent.com/samhocevar/tiled-pico8/master/pico8.py) and save it to that directory
+ - download [`pico8.py`](https://raw.githubusercontent.com/samhocevar/tiled-pico8/python/pico8.py) and save it to that directory
 
 # Example
 
