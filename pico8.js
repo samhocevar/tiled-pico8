@@ -128,7 +128,7 @@ function pico8_read(filename)
     // The second part of the sprite data also contains map data
     let gfx2 = gfx.slice(128 * 64).replace(/(.)(.)/g, '$2$1');
     for (let i = 0; i < Math.min(128 * 64, gfx2.length); i += 2)
-        set_tile(Math.floor(i / 2) % 128, 64 + Math.floor(i / 256), gfx2.substring(i, i + 2))
+        set_tile(Math.floor(i / 2) % 128, 32 + Math.floor(i / 256), gfx2.substring(i, i + 2))
     tle.apply()
     tm.addLayer(tl)
 
