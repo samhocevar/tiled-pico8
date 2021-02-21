@@ -68,14 +68,22 @@ function p8_extract(buf, header)
 }
 
 // Split a p8 cart in order to replace a hex section
+// NOTE: Drops the header. Be sure to include it back in when writing
 function p8_split(buf, header)
 {
     let gpos = buf.indexOf(header);
-    gpos = gpos < 0 ? buf.length : gpos + header.length;
+    if (gpos < 0)
+    {
+        return [buf, '', '']
+    }
+
+    let prefix = buf.slice(0, gpos)
+    gpos = gpos + header.length;
+
     let gend = buf.indexOf('__', gpos);
     if (gend < 0)
         gend = buf.length;
-    return [ buf.slice(0, gpos),
+    return [ prefix,
              buf.slice(gpos, gend).replace(/[^0-9a-fA-F]+/g, ''),
              buf.slice(gend, buf.length) ];
 }
@@ -196,12 +204,12 @@ function pico8_write(tm, filename)
 
     // Remove empty lines and store
     gfxOut = gfxOut.slice(0, 128 * 128).replace(/(0{128})+$/, '');
-    cart = [prefix].concat(gfxOut.match(/.{128}/g)).concat(suffix).join(eol);
+    cart = [prefix].concat('__gfx__').concat(gfxOut.match(/.{128}/g)).concat(suffix).join(eol);
 
     // Store map data. Contrary to gfx data, nothing is preserved.
     [ prefix, map, suffix ] = p8_split(cart, '__map__');
     map = data.slice(0, 256 * 32).replace(/(0{256})+$/, '');
-    cart = [prefix].concat(map.match(/.{256}/g)).concat(suffix).join(eol);
+    cart = [prefix].concat('__map__').concat(map.match(/.{256}/g)).concat(suffix).join(eol);
 
     // Save the file
     let f = new BinaryFile(filename, BinaryFile.WriteOnly);
