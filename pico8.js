@@ -1,7 +1,7 @@
 //
 //  PICO-8 cart support for Tiled
 //
-//  Copyright © 2020—2021 Sam Hocevar <sam@hocevar.net>
+//  Copyright © 2020—2023 Sam Hocevar <sam@hocevar.net>
 //
 //  This program is free software. It comes without any warranty, to
 //  the extent permitted by applicable law. You can redistribute it
@@ -51,6 +51,9 @@ const TILED_VERSION = tiled.version.split('.').map((e,i) => e*100**(2-i)).reduce
 const HEADER = 'pico-8 cartridge';
 const PROPNAME = 'Private Data';
 
+const MAP_WIDTH = 128;
+const MAP_HEIGHT = 64;
+
 function tohex(x, ndigits)
 {
     return (x + (1 << (ndigits * 4))).toString(16).slice(-ndigits);
@@ -91,7 +94,7 @@ function pico8_read(filename)
 
     // Create a map
     let tm = new TileMap();
-    tm.setSize(128, 64);
+    tm.setSize(MAP_WIDTH, MAP_HEIGHT);
     tm.setTileSize(8, 8);
     tm.orientation = TileMap.Orthogonal;
     tm.backgroundColor = PALETTE[0];
@@ -119,8 +122,8 @@ function pico8_read(filename)
     // Read map data into a tile layer
     let map = p8_extract(cart, '__map__');
     let tl = new TileLayer();
-    tl.width = 128;
-    tl.height = 64;
+    tl.width = MAP_WIDTH;
+    tl.height = MAP_HEIGHT;
     let tle = tl.edit();
     function set_tile(x, y, s)
     {
@@ -128,12 +131,16 @@ function pico8_read(filename)
         if (id > 0)
             tle.setTile(x, y, t.tile(id));
     }
-    for (let i = 0; i < Math.min(64 * 128, Math.floor(map.length / 2)); ++i)
-        set_tile(i % 128, Math.floor(i / 128), map.substring(i * 2, i * 2 + 2));
+    for (let i = 0; i < Math.min(MAP_HEIGHT * MAP_WIDTH, Math.floor(map.length / 2)); ++i)
+        set_tile(i % MAP_WIDTH,
+                 Math.floor(i / MAP_WIDTH),
+                 map.substring(i * 2, i * 2 + 2));
     // The second part of the sprite data also contains map data
     let gfx2 = gfx.slice(128 * 64).replace(/(.)(.)/g, '$2$1');;
     for (let i = 0; i < Math.min(128 * 64, gfx2.length); i += 2)
-        set_tile(Math.floor(i / 2) % 128, 32 + Math.floor(i / 256), gfx2.substring(i, i + 2));
+        set_tile(Math.floor(i / 2) % MAP_WIDTH,
+                 MAP_HEIGHT / 2 + Math.floor(i / 2 / MAP_WIDTH),
+                 gfx2.substring(i, i + 2));
     tle.apply();
     tm.addLayer(tl);
 
@@ -151,9 +158,9 @@ function pico8_write(tm, filename)
 
     // Convert map data to hex
     let data = '';
-    for (let i = 0; i < 128 * 64; ++i)
+    for (let i = 0; i < MAP_WIDTH * MAP_HEIGHT; ++i)
     {
-        let t = layer.cellAt(i % 128, Math.floor(i / 128)).tileId;
+        let t = layer.cellAt(i % MAP_WIDTH, Math.floor(i / MAP_WIDTH)).tileId;
         data += tohex(Math.max(t, 0), 2);
     }
 
