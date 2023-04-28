@@ -71,14 +71,22 @@ function p8_extract(buf, header)
 }
 
 // Split a p8 cart in order to replace a hex section
+// NOTE: Drops the header. Be sure to include it back in when writing
 function p8_split(buf, header)
 {
     let gpos = buf.indexOf(header);
-    gpos = gpos < 0 ? buf.length : gpos + header.length;
+    if (gpos < 0)
+    {
+        return [buf, '', '']
+    }
+
+    let prefix = buf.slice(0, gpos)
+    gpos = gpos + header.length;
+
     let gend = buf.indexOf('__', gpos);
     if (gend < 0)
         gend = buf.length;
-    return [ buf.slice(0, gpos),
+    return [ prefix,
              buf.slice(gpos, gend).replace(/[^0-9a-fA-F]+/g, ''),
              buf.slice(gend, buf.length) ];
 }
@@ -167,18 +175,48 @@ function pico8_write(tm, filename)
     // Retrieve gfx data from the original cart.
     let [ prefix, gfx, suffix ] = p8_split(cart, '__gfx__');
 
-    // The first 64 lines must be preserved. The next 64 lines are taken from
-    // the map section because they are from the shared area.
-    gfx = gfx.slice(0, 128 * 64).padEnd(128 * 64, '0')
-           + data.slice(128 * 64, 128 * 128).replace(/(.)(.)/g, '$2$1');
+    // Load the tileset used
+    let tileset = tm.tilesets[0];
+    let gfxOut = '';
+
+    // If there's an image set, the user has loaded an external tileset which we
+    // now need to store in the cart (on next load, it'll be pulled back out of
+    // the cart)
+    if (tileset.image)
+    {
+        // The first 64 lines are generated from the tileset image
+        let tilesetImage = new Image(tileset.image);
+
+        // Only take the first 128x64 pixels worth
+        for (let i = 0; i < 128 * 64; ++i)
+        {
+            // But allow the image itself to be any shape
+            let p = tilesetImage.pixelColor(i % tilesetImage.width, Math.floor(i / tilesetImage.width));
+            // Assume the image is already formatted in the PICO-8 palette
+            let c = PALETTE.findIndex((color) => color === p.toString().toLowerCase())
+            // Write it out as color 0 if there's not an exact match found
+            // TODO: Find the nearest colour instead
+            gfxOut += tohex(Math.max(c, 0), 1);
+        }
+    }
+    else
+    {
+        // The first 64 lines are preserved from the .p8 file
+        gfxOut = gfx.slice(0, 128 * 64).padEnd(128 * 64, '0');
+    }
+
+    // The next 64 lines are taken from the map section because they are from the
+    // shared area.
+    gfxOut = gfxOut + data.slice(128 * 64, 128 * 128).replace(/(.)(.)/g, '$2$1');
+
     // Remove empty lines and store
-    gfx = gfx.slice(0, 128 * 128).replace(/(0{128})+$/, '');
-    cart = [prefix].concat(gfx.match(/.{128}/g)).concat(suffix).join(eol);
+    gfxOut = gfxOut.slice(0, 128 * 128).replace(/(0{128})+$/, '');
+    cart = [prefix].concat('__gfx__').concat(gfxOut.match(/.{128}/g)).concat(suffix).join(eol);
 
     // Store map data. Contrary to gfx data, nothing is preserved.
     [ prefix, map, suffix ] = p8_split(cart, '__map__');
     map = data.slice(0, 256 * 32).replace(/(0{256})+$/, '');
-    cart = [prefix].concat(map.match(/.{256}/g)).concat(suffix).join(eol);
+    cart = [prefix].concat('__map__').concat(map.match(/.{256}/g)).concat(suffix).join(eol);
 
     // Save the file
     let f = new BinaryFile(filename, BinaryFile.WriteOnly);
